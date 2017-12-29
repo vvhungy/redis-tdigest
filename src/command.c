@@ -297,6 +297,42 @@ static int TDigestTypeDebug_RedisCommand(RedisModuleCtx *ctx,
     return REDISMODULE_OK;
 }
 
+/* TDIGEST.CENTROIDS key */
+static int TDigestTypeCentroids_RedisCommand(RedisModuleCtx *ctx,
+        RedisModuleString **argv, int argc) {
+    RedisModule_AutoMemory(ctx); /* Use automatic memory management. */
+
+    if (argc != 2)
+        return RedisModule_WrongArity(ctx);
+
+    RedisModuleKey *key = RedisModule_OpenKey(ctx, argv[1],
+            REDISMODULE_READ | REDISMODULE_WRITE);
+    int type = RedisModule_KeyType(key);
+    if (type == REDISMODULE_KEYTYPE_EMPTY) {
+        RedisModule_ReplyWithNull(ctx);
+        return REDISMODULE_OK;
+    }
+    else if (RedisModule_ModuleTypeGetType(key) != TDigestType) {
+        return RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
+    }
+
+    struct TDigest *t = RedisModule_ModuleTypeGetValue(key);
+
+    tdigestCompress(t);
+
+    RedisModule_ReplyWithArray(ctx, REDISMODULE_POSTPONED_ARRAY_LEN);
+    int i;
+    for (i = 0; i < t->num_centroids; i++) {
+        struct Centroid *c = &t->centroids[i];
+        RedisModule_ReplyWithArray(ctx, 2);
+        RedisModule_ReplyWithDouble(ctx, c->mean);
+        RedisModule_ReplyWithLongLong(ctx, c->weight);
+    }
+    RedisModule_ReplySetArrayLength(ctx, i);
+
+    return REDISMODULE_OK;
+}
+
 /* ========================== "tdigest" type methods ======================= */
 
 static void *TDigestTypeRdbLoad(RedisModuleIO *rdb, int encver) {
@@ -398,6 +434,11 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx) {
 
     if (RedisModule_CreateCommand(ctx, "tdigest.quantile",
             TDigestTypeQuantile_RedisCommand, "readonly", 1, 1,
+            1) == REDISMODULE_ERR)
+        return REDISMODULE_ERR;
+
+    if (RedisModule_CreateCommand(ctx, "tdigest.centroids",
+            TDigestTypeCentroids_RedisCommand, "readonly", 1, 1,
             1) == REDISMODULE_ERR)
         return REDISMODULE_ERR;
 
