@@ -320,15 +320,13 @@ static int TDigestTypeCentroids_RedisCommand(RedisModuleCtx *ctx,
 
     tdigestCompress(t);
 
-    RedisModule_ReplyWithArray(ctx, REDISMODULE_POSTPONED_ARRAY_LEN);
+    RedisModule_ReplyWithArray(ctx, 2*t->num_centroids);
     int i;
     for (i = 0; i < t->num_centroids; i++) {
         struct Centroid *c = &t->centroids[i];
-        RedisModule_ReplyWithArray(ctx, 2);
         RedisModule_ReplyWithDouble(ctx, c->mean);
-        RedisModule_ReplyWithLongLong(ctx, c->weight);
+        RedisModule_ReplyWithDouble(ctx, c->weight);
     }
-    RedisModule_ReplySetArrayLength(ctx, i);
 
     return REDISMODULE_OK;
 }
